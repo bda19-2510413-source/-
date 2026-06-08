@@ -1,0 +1,6 @@
+{
+  "name": "학생 태도 평가기",
+  "description": "학생들의 생활패턴을 긍정적으로 상담 평가하고, 각 번호별 점수 및 생기부 연동 의견을 기록하는 다기능 학생 평가 시스템",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
