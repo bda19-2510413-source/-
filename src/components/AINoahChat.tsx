@@ -9,10 +9,10 @@ interface AINoahChatProps {
 export default function AINoahChat({ onTriggerResultPage }: AINoahChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: 'welcome',
-      role: 'assistant',
-      content: '안녕, 찾아와 줘서 고마워. 난 여기 늘 머무르는 편안한 고민 상담가 승환이야. 😉\n오늘 마음 복잡한 일이나, 남들에겐 꺼내놓기 힘든 속상함이 있었다면 편하게 털어놔 봐. 가만히 경청하고 네 마음에 따뜻한 온기가 스밀 수 있도록 차분하게 들어줄게. 언제든 네 곁에 있을 테니까 너무 걱정하지 마.',
-      timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+       id: 'welcome',
+       role: 'assistant',
+       content: '안녕! 찾아와 줘서 고마워. 난 여기 늘 머무르며 너희의 고민을 듣고 지지하는 친근한 상담교사 승환 쌤이야. 😉\n오늘 학교생활이나 친구 관계, 학업 고민 등으로 마음이 답답하거나 혼자만 앓던 속상함이 있다면 선생님한테 편하게 털어놓으렴. 차분하게 귀 기울이며 네가 따뜻한 안식을 얻을 수 있도록 곁에 있어 줄게. 너무 걱정하지 말렴.',
+       timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
     }
   ]);
   const [input, setInput] = useState('');
@@ -110,7 +110,7 @@ export default function AINoahChat({ onTriggerResultPage }: AINoahChatProps) {
         {
           id: Math.random().toString(),
           role: 'assistant',
-          content: '아이고 무안해라.. 인터넷 신호가 어른어른하네! 형/누나한테 다시 한 번만 똑바로 얘기해 줄래?',
+          content: '어이쿠.. 갑자기 인터넷 연결 상태가 흐릿하단다. 미안하다만 선생님한테 다시 한 번만 차분하게 들려줄 수 있겠니?',
           timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
           pillar: '[힘들고 우울한 마음]'
         }
@@ -143,7 +143,7 @@ export default function AINoahChat({ onTriggerResultPage }: AINoahChatProps) {
             <h3 className="font-semibold text-slate-100 font-display">추천 소통 생각거리</h3>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed mb-5">
-            아래 평범한 고민 주제 예시를 가볍게 터치해 보세요. 마음 멘토 승환이가 조용히 경청하고 가슴 따뜻한 차분한 조언을 건네 드립니다.
+            아래 평범한 고민 주제 예시를 가볍게 터치해 보세요. 상담교사 승환 선생님이 사려 깊고 따뜻하며 편안한 격려를 건네 드립니다.
           </p>
           
           <div className="space-y-3">
@@ -186,9 +186,9 @@ export default function AINoahChat({ onTriggerResultPage }: AINoahChatProps) {
             </div>
             <div>
               <div className="font-semibold text-slate-100 text-sm flex items-center gap-1.5">
-                동네 멘토 이승환 <Sparkles className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
+                상담교사 이승환 쌤 <Sparkles className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
               </div>
-              <span className="text-xs text-slate-400">마음을 위로하는 차분한 경청 대화방</span>
+              <span className="text-xs text-slate-400">마음을 따뜻하게 이끌어주는 아늑한 상담실</span>
             </div>
           </div>
           <div className="px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/50 text-[11px] text-slate-300 flex items-center gap-1">
@@ -247,7 +247,7 @@ export default function AINoahChat({ onTriggerResultPage }: AINoahChatProps) {
                 <span className="w-2.5 h-2.5 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2.5 h-2.5 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-              <span className="text-xs text-slate-500 font-medium">승환이가 조용히 생각을 정리하는 중...</span>
+              <span className="text-xs text-slate-500 font-medium">승환 선생님이 조용히 머리를 맞대며 조언을 다듬는 중...</span>
             </div>
           )}
         </div>

@@ -9,6 +9,7 @@ interface SchoolRecordTableProps {
   onNameChange: (index: number, val: string) => void;
   onSaveAll: (updatedScores?: number[], updatedOpinions?: string[], updatedNames?: string[]) => Promise<void>;
   saving: boolean;
+  lastUpdatedAt?: string | null;
 }
 
 export default function SchoolRecordTable({
@@ -19,12 +20,34 @@ export default function SchoolRecordTable({
   onNameChange,
   onSaveAll,
   saving,
+  lastUpdatedAt,
 }: SchoolRecordTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTier, setFilterTier] = useState<'all' | 'space' | 'sky' | 'ground' | 'empty'>('all');
   const [localOpinions, setLocalOpinions] = useState<string[]>(opinions);
   const [localNames, setLocalNames] = useState<string[]>(names);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'writing' | 'saved'>('idle');
+
+  const formatLastUpdated = (timeStr: string | null | undefined) => {
+    if (!timeStr) return "기록 없음";
+    try {
+      if (timeStr.includes(':') && !timeStr.includes('T')) {
+        return timeStr;
+      }
+      const d = new Date(timeStr);
+      if (isNaN(d.getTime())) return timeStr;
+      return d.toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch (e) {
+      return timeStr;
+    }
+  };
 
   // Sync internal copies when parent updates
   useEffect(() => {
@@ -124,9 +147,16 @@ export default function SchoolRecordTable({
               <h2 className="text-xl font-bold font-serif tracking-tight text-[#453e34] flex items-center gap-1.5">
                 학교생활기록 종합 대장 (학급 반장 의견록)
               </h2>
-              <p className="text-xs text-[#8c8266] mt-0.5">
-                각 번호별 행동 발달 특성 관찰 및 기기 공유 데이터베이스 암호화 등기
-              </p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5 text-xs">
+                <p className="text-[#8c8266]">
+                  각 번호별 행동 발달 특성 관찰 및 기기 공유 데이터베이스 암호화 등기
+                </p>
+                <span className="hidden sm:inline text-[#d2cbba]">|</span>
+                <p className="text-emerald-800 font-bold bg-[#edf7f3] px-2.5 py-0.5 rounded border border-[#cbebe0] flex items-center gap-1 font-mono text-[11px]">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shrink-0" />
+                  최근 기록 업데이트: {formatLastUpdated(lastUpdatedAt)}
+                </p>
+              </div>
             </div>
           </div>
 

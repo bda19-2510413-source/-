@@ -49,6 +49,7 @@ export default function App() {
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
   const [showCloudSettings, setShowCloudSettings] = useState(false);
   const [cloudConnected, setCloudConnected] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(() => localStorage.getItem('noah_last_updated'));
 
   // Reset entire evaluation board back to default values
   const handleResetAll = async () => {
@@ -73,11 +74,13 @@ export default function App() {
       const localOpinions = localStorage.getItem('noah_opinions');
       const localNames = localStorage.getItem('noah_names');
       const localUnlocked = localStorage.getItem('noah_unlocked');
+      const localLastUpdated = localStorage.getItem('noah_last_updated');
 
       if (localScores) setScores(JSON.parse(localScores));
       if (localOpinions) setOpinions(JSON.parse(localOpinions));
       if (localNames) setNames(JSON.parse(localNames));
       if (localUnlocked) setUnlocked(localUnlocked === 'true');
+      if (localLastUpdated) setLastUpdatedAt(localLastUpdated);
 
       // 2. Try loading from Google Firebase Firestore if enabled
       if (isFirebaseEnabled()) {
@@ -86,6 +89,10 @@ export default function App() {
           setScores(cloudData.scores);
           setOpinions(cloudData.opinions);
           setNames(cloudData.names);
+          if (cloudData.updatedAt) {
+            setLastUpdatedAt(cloudData.updatedAt);
+            localStorage.setItem('noah_last_updated', cloudData.updatedAt);
+          }
           
           localStorage.setItem('noah_scores', JSON.stringify(cloudData.scores));
           localStorage.setItem('noah_opinions', JSON.stringify(cloudData.opinions));
@@ -167,6 +174,10 @@ export default function App() {
         setScores(data.scores);
         setOpinions(data.opinions);
         setNames(data.names);
+        if (data.updatedAt) {
+          setLastUpdatedAt(data.updatedAt);
+          localStorage.setItem('noah_last_updated', data.updatedAt);
+        }
         
         // Ensure local values are updated
         localStorage.setItem('noah_scores', JSON.stringify(data.scores));
@@ -196,6 +207,10 @@ export default function App() {
     localStorage.setItem('noah_scores', JSON.stringify(updatedScores));
     localStorage.setItem('noah_opinions', JSON.stringify(updatedOpinions));
     localStorage.setItem('noah_names', JSON.stringify(updatedNames));
+
+    const nowStr = new Date().toISOString();
+    setLastUpdatedAt(nowStr);
+    localStorage.setItem('noah_last_updated', nowStr);
 
     // Try cloud write if active
     if (cloudConnected) {
@@ -324,7 +339,7 @@ export default function App() {
               <h1 className="text-lg font-black tracking-tight font-display flex items-center gap-2">
                 이승환의 일상 고민 상담소 <span className="text-xs font-normal text-emerald-400 font-mono bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/10">v1.2</span>
               </h1>
-              <p className="text-[11px] text-slate-400">동네 형, 누나 이승환이 들려주는 따뜻한 진심의 이야기 공간</p>
+              <p className="text-[11px] text-slate-400">친근한 선생님 이승환이 들려주는 따뜻한 위로와 성장의 이야기 공간</p>
             </div>
           </div>
 
@@ -425,8 +440,8 @@ export default function App() {
                 <div className="bg-gradient-to-r from-emerald-950/40 to-teal-950/25 border border-emerald-900/40 rounded-xl p-4 mb-6 text-xs text-emerald-300 flex items-start gap-3 animate-fade-in">
                   <Sparkles className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h5 className="font-bold mb-1">[공지] 승환이 소통 편지함 이용 안내</h5>
-                    <span>이곳은 청소년 여러분들이 마음껏 하소연하거나 매일의 소소한 재미, 친구 오해 등 말 못 할 사연들을 안전하게 이야기하는 우체통방입니다. 승환이 형/누나가 완전히 네 편이 되어 유쾌하고 따스한 격려의 말을 매일 아낌없이 전해 줍니다!</span>
+                    <h5 className="font-bold mb-1">[공지] 승환 선생님 소통 편지함 이용 안내</h5>
+                    <span>이곳은 청소년 여러분들이 마음껏 하소연하거나 매일의 소소한 재미, 친구 오해 등 말 못 할 사연들을 안전하게 이야기하는 우체통방입니다. 친근한 승환 선생님이 완전히 여러분의 편이 되어 유쾌하고 따스한 격려의 말을 아낌없이 전해 줍니다!</span>
                   </div>
                 </div>
 
@@ -565,6 +580,7 @@ export default function App() {
                   onNameChange={handleNameChange}
                   onSaveAll={saveRecords}
                   saving={saving}
+                  lastUpdatedAt={lastUpdatedAt}
                 />
               </div>
             )}

@@ -22,7 +22,8 @@ import {
   getClassCode, 
   setClassCode, 
   isFirebaseEnabled, 
-  initializeFirebase 
+  initializeFirebase,
+  testCloudConnection
 } from '../firebase';
 
 interface CloudSyncSettingsProps {
@@ -36,6 +37,7 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
   const [isCloudActive, setIsCloudActive] = useState(isFirebaseEnabled());
   const [showConfigDetails, setShowConfigDetails] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [testing, setTesting] = useState(false);
   
   // Custom Firebase fields config form
   const [apiKey, setApiKey] = useState('');
@@ -127,6 +129,18 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
     setStatusMsg({ text: '설정된 사용자 정의 Firebase 세션이 해제되었습니다.', type: 'info' });
     onConfigChange();
     setTimeout(() => setStatusMsg({ text: '', type: null }), 3000);
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setStatusMsg({ text: '데이터베이스 연결 상태를 가상 쿼리로 점검하는 중입니다...', type: 'info' });
+    const result = await testCloudConnection();
+    if (result.success) {
+      setStatusMsg({ text: result.message, type: 'success' });
+    } else {
+      setStatusMsg({ text: result.message, type: 'error' });
+    }
+    setTesting(false);
   };
 
   const handleCopyVercelEnv = () => {
@@ -310,15 +324,27 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
                   </div>
                 </div>
 
-                <div className="flex gap-2.5 justify-end pt-3 text-[11px] font-bold">
+                <div className="flex gap-2.5 justify-end pt-3 text-[11px] font-bold flex-wrap">
                   {isCloudActive && (
-                    <button
-                      type="button"
-                      onClick={handleClearCustomFirebase}
-                      className="px-3 py-2 bg-slate-900 hover:bg-red-950/20 hover:border-red-500/30 text-rose-400 border border-slate-800 rounded-xl transition-all cursor-pointer"
-                    >
-                      실시간 구동 해제
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleClearCustomFirebase}
+                        className="px-3 py-2 bg-slate-900 hover:bg-red-950/20 hover:border-red-500/30 text-rose-400 border border-slate-800 rounded-xl transition-all cursor-pointer"
+                      >
+                        실시간 구동 해제
+                      </button>
+                      <button
+                        type="button"
+                        disabled={testing}
+                        onClick={handleTestConnection}
+                        title="Firebase 실시간 트랜잭션을 진단하고 규칙(Rules) 오류 여부를 점검합니다."
+                        className="px-3 py-2 bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-500/30 text-emerald-300 rounded-xl transition-all cursor-pointer flex items-center gap-1 font-bold"
+                      >
+                        <Wifi className={`w-3.5 h-3.5 text-emerald-400 ${testing ? 'animate-bounce' : ''}`} />
+                        <span>연결 상태 진단</span>
+                      </button>
+                    </>
                   )}
                   
                   <button

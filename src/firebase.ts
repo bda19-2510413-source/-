@@ -147,7 +147,7 @@ export async function saveRecordsToCloud(
 
 // Subscription setup for real-time live synchronization (No manual refreshing required!)
 export function setupCloudSyncListener(
-  onUpdate: (data: { scores: number[]; opinions: string[]; names: string[] }) => void
+  onUpdate: (data: { scores: number[]; opinions: string[]; names: string[]; updatedAt?: string }) => void
 ): (() => void) | null {
   if (!isFirebaseEnabled() || !firestoreDb) return null;
 
@@ -163,7 +163,8 @@ export function setupCloudSyncListener(
           onUpdate({
             scores: data.scores,
             opinions: data.opinions,
-            names: data.names
+            names: data.names,
+            updatedAt: data.updatedAt
           });
         }
       }
@@ -179,7 +180,7 @@ export function setupCloudSyncListener(
 }
 
 // One-time load from Cloud
-export async function loadRecordsFromCloud(): Promise<{ scores: number[]; opinions: string[]; names: string[] } | null> {
+export async function loadRecordsFromCloud(): Promise<{ scores: number[]; opinions: string[]; names: string[]; updatedAt?: string } | null> {
   if (!isFirebaseEnabled() || !firestoreDb) return null;
 
   const classCode = getClassCode();
@@ -192,7 +193,8 @@ export async function loadRecordsFromCloud(): Promise<{ scores: number[]; opinio
         return {
           scores: data.scores,
           opinions: data.opinions,
-          names: data.names
+          names: data.names,
+          updatedAt: data.updatedAt
         };
       }
     }
@@ -205,4 +207,39 @@ export async function loadRecordsFromCloud(): Promise<{ scores: number[]; opinio
     }
   }
   return null;
+}
+
+// Perform simulated write/read to test exact connection status & rules restrictions
+export async function testCloudConnection(): Promise<{ success: boolean; message: string }> {
+  if (!isFirebaseEnabled() || !firestoreDb) {
+    return { success: false, message: "Firebase가 초기화되지 않았거나 아직 구성 정보가 부실합니다." };
+  }
+  try {
+    const classCode = getClassCode();
+    const documentRef = doc(firestoreDb, "classes", classCode);
+    
+    // Read test
+    await getDoc(documentRef);
+    return { success: true, message: "축하합니다! 클라우드 데이터베이스(Firestore)와의 쌍방향 통신 테스트가 완벽히 성공하였습니다." };
+  } catch (error: any) {
+    const code = error?.code || "";
+    const msg = error?.message || String(error);
+    
+    if (code === "permission-denied") {
+      return { 
+        success: false, 
+        message: "권한 오류(permission-denied)가 감지되었습니다. 새 Firebase 프로젝트를 만든 후 'Firestore Database'를 개설하고, 규칙(Rules) 탭에서 읽기/쓰기가 허용되어 있는지 확인해 주세요! (기본값 설정 필요: allow read, write: if true;)"
+      };
+    } else if (msg.includes("unreachable") || msg.includes("offline") || code === "unavailable") {
+      return {
+        success: false,
+        message: "데이터베이스 연결이 비활성화되었거나 오프라인 장치 상태입니다. 인터넷 브라우저 상태를 점검하거나 Firebase 프로젝트 API 세팅을 점검해 주세요."
+      };
+    } else {
+      return {
+        success: false,
+        message: `통신 장애 오류 [${code}]: 다른 활성화 구역이나 Firebase Firestore의 생성 여부를 마저 클릭해 주세요. 상세 내용: ${msg}`
+      };
+    }
+  }
 }
