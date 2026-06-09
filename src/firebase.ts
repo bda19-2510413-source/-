@@ -31,7 +31,9 @@ export function getStoredFirebaseConfig(): FirebaseConfig | null {
   if (localConfigStr) {
     try {
       const parsed = JSON.parse(localConfigStr);
-      if (parsed.apiKey && parsed.projectId) {
+      if (parsed.projectId === 'c2-8class') {
+        localStorage.removeItem('noah_firebase_config');
+      } else if (parsed.apiKey && parsed.projectId) {
         return parsed as FirebaseConfig;
       }
     } catch (e) {
@@ -41,12 +43,12 @@ export function getStoredFirebaseConfig(): FirebaseConfig | null {
 
   // 3. Default system connection values (provided by user for zero-config global sync)
   return {
-    apiKey: "AIzaSyCpjiht5MHfdN5JgHjyJ561sMQovQwnisM",
-    authDomain: "c2-8class.firebaseapp.com",
-    projectId: "c2-8class",
-    storageBucket: "c2-8class.appspot.com",
-    messagingSenderId: "652780236309",
-    appId: "1:652780236309:web:97fb8a64afdc28a4d1281c"
+    apiKey: "AIzaSyBpyyBqAjbMZwLpzxzZjokM6CGhv_J2xns",
+    authDomain: "e2-8class-69464.firebaseapp.com",
+    projectId: "e2-8class-69464",
+    storageBucket: "e2-8class-69464.firebasestorage.app",
+    messagingSenderId: "863887869763",
+    appId: "1:863887869763:web:f80f04da55b7414fe711f6"
   };
 }
 
@@ -93,9 +95,13 @@ export function initializeFirebase(): boolean {
 export function getClassCode(): string {
   const storedCode = localStorage.getItem('noah_class_code');
   if (storedCode && storedCode.trim() !== "") {
-    return storedCode.trim();
+    if (storedCode.trim() === "c2-8class") {
+      localStorage.removeItem('noah_class_code');
+    } else {
+      return storedCode.trim();
+    }
   }
-  return "c2-8class";
+  return "e2-8class";
 }
 
 export function setClassCode(code: string) {
