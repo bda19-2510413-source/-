@@ -37,7 +37,30 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
   const [isCloudActive, setIsCloudActive] = useState(isFirebaseEnabled());
   const [showConfigDetails, setShowConfigDetails] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [testing, setTesting] = useState(false);
+  
+  const getShareUrl = () => {
+    if (typeof window === 'undefined') return '';
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    const code = classCode.trim() || getClassCode();
+    return `${origin}${pathname}?code=${encodeURIComponent(code)}`;
+  };
+
+  const handleCopyShareUrl = () => {
+    const url = getShareUrl();
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setShareCopied(true);
+    setStatusMsg({ 
+      text: `기기간 자동 연동 주소(${classCode.trim() || getClassCode()})가 복사되었습니다! 이 링크를 스마트폰이나 다른 컴퓨터 창에 복사해 접속해주세요.`, 
+      type: 'success' 
+    });
+    setTimeout(() => {
+      setShareCopied(false);
+    }, 4500);
+  };
   
   // Custom Firebase fields config form
   const [apiKey, setApiKey] = useState('');
@@ -217,6 +240,33 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
               >
                 코드 적용
               </button>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-900 flex flex-col gap-2.5">
+              <div className="text-[10px] text-slate-400 flex justify-between items-center font-semibold">
+                <span className="flex items-center gap-1">🔗 다른 기기 간 자동연동 공유 주소</span>
+                {shareCopied && <span className="text-emerald-400 font-bold animate-pulse">복사되었습니다!</span>}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={getShareUrl()}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                  className="flex-1 bg-slate-900/60 border border-slate-850 rounded-xl px-3 py-2 text-[10px] text-slate-400 focus:outline-none select-all"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyShareUrl}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-200 hover:text-white font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>주소 복사</span>
+                </button>
+              </div>
+              <p className="text-[10px] text-teal-400/80 leading-relaxed font-semibold">
+                ※ 위 <strong className="text-teal-300">주소 복사</strong> 버튼을 눌러 다른 기기(스마트폰, 다른 환경 컴퓨터)에 복사하여 붙여넣어 접속하면 별도 세팅값을 타이핑하지 않고도 <strong className="text-white">실시간 점수판 양방향 동기화</strong>가 시작됩니다!
+              </p>
             </div>
           </div>
 

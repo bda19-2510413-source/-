@@ -95,6 +95,17 @@ export function initializeFirebase(): boolean {
 
 // Get the unique class code for document sync to support multiple classrooms or simple room codes
 export function getClassCode(): string {
+  // 1. URL 쿼리 파라미터가 있는지 우선적으로 감지해 자동 동기화 (기기간 간편 연동 솔루션)
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const urlCode = params.get('code') || params.get('class') || params.get('id');
+    if (urlCode && urlCode.trim() !== "") {
+      const decodedCode = decodeURIComponent(urlCode.trim()).toLowerCase();
+      localStorage.setItem('noah_class_code', decodedCode);
+      return decodedCode;
+    }
+  }
+
   const storedCode = localStorage.getItem('noah_class_code');
   if (storedCode && storedCode.trim() !== "") {
     const trimmed = storedCode.trim();
