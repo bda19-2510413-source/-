@@ -8,6 +8,7 @@ export interface FirebaseConfig {
   storageBucket: string;
   messagingSenderId: string;
   appId: string;
+  measurementId?: string;
 }
 
 // Check if valid config exists in environment keys or localStorage
@@ -31,7 +32,7 @@ export function getStoredFirebaseConfig(): FirebaseConfig | null {
   if (localConfigStr) {
     try {
       const parsed = JSON.parse(localConfigStr);
-      if (parsed.projectId === 'c2-8class') {
+      if (parsed.projectId === 'c2-8class' || parsed.projectId === 'e2-8class') {
         localStorage.removeItem('noah_firebase_config');
       } else if (parsed.apiKey && parsed.projectId) {
         return parsed as FirebaseConfig;
@@ -48,7 +49,8 @@ export function getStoredFirebaseConfig(): FirebaseConfig | null {
     projectId: "e2-8class-69464",
     storageBucket: "e2-8class-69464.firebasestorage.app",
     messagingSenderId: "863887869763",
-    appId: "1:863887869763:web:f80f04da55b7414fe711f6"
+    appId: "1:863887869763:web:f80f04da55b7414fe711f6",
+    measurementId: "G-W7CF1B1F0D"
   };
 }
 
@@ -95,13 +97,14 @@ export function initializeFirebase(): boolean {
 export function getClassCode(): string {
   const storedCode = localStorage.getItem('noah_class_code');
   if (storedCode && storedCode.trim() !== "") {
-    if (storedCode.trim() === "c2-8class") {
+    const trimmed = storedCode.trim();
+    if (trimmed === "c2-8class" || trimmed === "e2-8class") {
       localStorage.removeItem('noah_class_code');
     } else {
-      return storedCode.trim();
+      return trimmed;
     }
   }
-  return "e2-8class";
+  return "e2-8class-69464";
 }
 
 export function setClassCode(code: string) {

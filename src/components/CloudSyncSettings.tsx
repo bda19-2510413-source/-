@@ -56,19 +56,14 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
       setLocalClassCode(getClassCode());
       setIsCloudActive(isFirebaseEnabled());
       
-      const localConfig = localStorage.getItem('noah_firebase_config');
-      if (localConfig) {
-        try {
-          const parsed = JSON.parse(localConfig) as FirebaseConfig;
-          setApiKey(parsed.apiKey || '');
-          setAuthDomain(parsed.authDomain || '');
-          setProjectId(parsed.projectId || '');
-          setStorageBucket(parsed.storageBucket || '');
-          setMessagingSenderId(parsed.messagingSenderId || '');
-          setAppId(parsed.appId || '');
-        } catch (e) {
-          console.error(e);
-        }
+      const config = getStoredFirebaseConfig();
+      if (config) {
+        setApiKey(config.apiKey || '');
+        setAuthDomain(config.authDomain || '');
+        setProjectId(config.projectId || '');
+        setStorageBucket(config.storageBucket || '');
+        setMessagingSenderId(config.messagingSenderId || '');
+        setAppId(config.appId || '');
       }
     }
   }, [isOpen]);
