@@ -1,0 +1,373 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Database, 
+  Wifi, 
+  WifiOff, 
+  Key, 
+  Settings, 
+  Copy, 
+  Check, 
+  Save, 
+  RefreshCw, 
+  Info,
+  X,
+  Sparkles,
+  HelpCircle,
+  FilePlus,
+  ArrowRight
+} from 'lucide-react';
+import { 
+  FirebaseConfig, 
+  getStoredFirebaseConfig, 
+  getClassCode, 
+  setClassCode, 
+  isFirebaseEnabled, 
+  initializeFirebase 
+} from '../firebase';
+
+interface CloudSyncSettingsProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfigChange: () => void;
+}
+
+export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: CloudSyncSettingsProps) {
+  const [classCode, setLocalClassCode] = useState(getClassCode());
+  const [isCloudActive, setIsCloudActive] = useState(isFirebaseEnabled());
+  const [showConfigDetails, setShowConfigDetails] = useState(false);
+  const [copied, setCopied] = useState(false);
+  
+  // Custom Firebase fields config form
+  const [apiKey, setApiKey] = useState('');
+  const [authDomain, setAuthDomain] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [storageBucket, setStorageBucket] = useState('');
+  const [messagingSenderId, setMessagingSenderId] = useState('');
+  const [appId, setAppId] = useState('');
+
+  // Status message notice
+  const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' | null }>({ text: '', type: null });
+
+  // Load existing configuration on open
+  useEffect(() => {
+    if (isOpen) {
+      setLocalClassCode(getClassCode());
+      setIsCloudActive(isFirebaseEnabled());
+      
+      const localConfig = localStorage.getItem('noah_firebase_config');
+      if (localConfig) {
+        try {
+          const parsed = JSON.parse(localConfig) as FirebaseConfig;
+          setApiKey(parsed.apiKey || '');
+          setAuthDomain(parsed.authDomain || '');
+          setProjectId(parsed.projectId || '');
+          setStorageBucket(parsed.storageBucket || '');
+          setMessagingSenderId(parsed.messagingSenderId || '');
+          setAppId(parsed.appId || '');
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSaveClassCode = () => {
+    const trimmed = classCode.trim();
+    if (!trimmed) {
+      setStatusMsg({ text: '학급 코드를 입력해주세요.', type: 'error' });
+      return;
+    }
+    setClassCode(trimmed);
+    onConfigChange();
+    setStatusMsg({ text: `학급 코드가 '${trimmed}'(으)로 변경되었습니다.`, type: 'success' });
+    setTimeout(() => setStatusMsg({ text: '', type: null }), 3000);
+  };
+
+  const handleSaveCustomFirebase = () => {
+    if (!apiKey.trim() || !projectId.trim()) {
+      setStatusMsg({ text: 'API Key와 Project ID는 필수 항목입니다!', type: 'error' });
+      return;
+    }
+
+    const newConfig: FirebaseConfig = {
+      apiKey: apiKey.trim(),
+      authDomain: authDomain.trim(),
+      projectId: projectId.trim(),
+      storageBucket: storageBucket.trim(),
+      messagingSenderId: messagingSenderId.trim(),
+      appId: appId.trim()
+    };
+
+    localStorage.setItem('noah_firebase_config', JSON.stringify(newConfig));
+    const ok = initializeFirebase();
+    setIsCloudActive(ok);
+    
+    if (ok) {
+      setStatusMsg({ text: '축하합니다! 클라우드 Firebase 데이터베이스가 성공적으로 설정되었습니다.', type: 'success' });
+      onConfigChange();
+    } else {
+      setStatusMsg({ text: 'Firebase 연결에 실패했습니다. 키 값을 확인해주세요.', type: 'error' });
+    }
+    setTimeout(() => setStatusMsg({ text: '', type: null }), 4000);
+  };
+
+  const handleClearCustomFirebase = () => {
+    localStorage.removeItem('noah_firebase_config');
+    localStorage.removeItem('noah_unlocked');
+    initializeFirebase();
+    setIsCloudActive(isFirebaseEnabled());
+    setApiKey('');
+    setAuthDomain('');
+    setProjectId('');
+    setStorageBucket('');
+    setMessagingSenderId('');
+    setAppId('');
+    setStatusMsg({ text: '설정된 사용자 정의 Firebase 세션이 해제되었습니다.', type: 'info' });
+    onConfigChange();
+    setTimeout(() => setStatusMsg({ text: '', type: null }), 3000);
+  };
+
+  const handleCopyVercelEnv = () => {
+    const envString = `VITE_FIREBASE_API_KEY="${apiKey}"\nVITE_FIREBASE_AUTH_DOMAIN="${authDomain}"\nVITE_FIREBASE_PROJECT_ID="${projectId}"\nVITE_FIREBASE_STORAGE_BUCKET="${storageBucket}"\nVITE_FIREBASE_MESSAGING_SENDER_ID="${messagingSenderId}"\nVITE_FIREBASE_APP_ID="${appId}"`;
+    navigator.clipboard.writeText(envString);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative animate-scale-in text-slate-100">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className={`p-2 rounded-xl flex items-center justify-center ${isCloudActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-850 text-slate-400'}`}>
+              <Database className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base font-display">실시간 클라우드 동기화 제어</h3>
+              <p className="text-xs text-slate-400 flex items-center gap-1">
+                {isCloudActive ? (
+                  <>
+                    <span className="w-2 h-2 bg-green-500 rounded-full inline-block animate-ping" />
+                    <span className="text-emerald-400 font-semibold font-mono">LIVE CLOUD ACTIVE</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 bg-yellow-500 rounded-full inline-block" />
+                    <span className="text-slate-400">오프라인 브라우저 및 로컬 모드</span>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 transition-all cursor-pointer flex items-center justify-center"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Explain Card */}
+        <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-850 mb-5 text-xs text-slate-300 leading-relaxed space-y-2">
+          <p className="font-semibold text-teal-400 flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5" /> 다른 기기, 모바일, 태블릿과 공유되는 원리
+          </p>
+          <p>
+            Vercel과 같은 서버리스 주소나 모바일에서 접속할 경우, 로컬 서버 재부팅 시 데이터가 초기화될 수 있습니다. 
+            아래에 <strong>나만의 학급 코드(방번호)</strong>를 개설하고 무료 <strong>Google Firebase(Firestore)</strong>를 연동해 두면, 전 세계 어디서든 학급 현황판의 아이콘을 드래그하는 즉시 여러 기기에서 실시간 동기화됩니다!
+          </p>
+        </div>
+
+        {/* Form elements */}
+        <div className="space-y-5">
+          {/* Section 1: Room Key (Class Code) */}
+          <div className="p-4 bg-slate-950 rounded-2xl border border-slate-850/80">
+            <label className="text-[11px] text-teal-400 font-bold tracking-wider uppercase block mb-1.5 flex items-center gap-1">
+              <Key className="w-3.5 h-3.5" /> 1단계: 나만의 공유 학급 코드 (방 번호)
+            </label>
+            <p className="text-[10px] text-slate-500 mb-2.5">
+              동일한 카카오톡방이나 다른 기기에서 이 코드를 똑같이 맞추면 실시간으로 학급 데이터가 하나로 전송/공유됩니다.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={classCode}
+                onChange={(e) => setLocalClassCode(e.target.value)}
+                placeholder="예: woojoeng-3-2"
+                className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-teal-500/50"
+              />
+              <button
+                type="button"
+                onClick={handleSaveClassCode}
+                className="px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-950/20"
+              >
+                코드 적용
+              </button>
+            </div>
+          </div>
+
+          {/* Section 2: Firebase Connection Settings */}
+          <div className="p-4 bg-slate-950/40 rounded-2xl border border-slate-850/60">
+            <div className="flex justify-between items-center mb-1">
+              <button
+                type="button"
+                onClick={() => setShowConfigDetails(!showConfigDetails)}
+                className="text-xs text-slate-300 font-bold hover:text-white flex items-center gap-1.5 cursor-pointer"
+              >
+                <Settings className={`w-3.5 h-3.5 text-amber-500 ${showConfigDetails ? 'rotate-45' : ''} transition-all`} />
+                <span>2단계: Google Firebase 클라우드 DB 연동 설정</span>
+              </button>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isCloudActive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 border border-slate-700/60'}`}>
+                {isCloudActive ? "연결됨" : "로컬 브라우저 저장"}
+              </span>
+            </div>
+            
+            <p className="text-[10px] text-slate-500 mb-3 ml-5">
+              사용자가 직접 발급받은 무료 Firebase 정보로 동기화합니다. Vercel이나 개인 깃허브 페이지에서 완벽한 영구 보관이 가능해집니다.
+            </p>
+
+            {/* Hidden Input drawer */}
+            {showConfigDetails && (
+              <div className="space-y-3 mt-4 pt-4 border-t border-slate-850/80 animate-fade-in text-xs">
+                <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-850/80 text-[10px] text-slate-400 leading-relaxed mb-4">
+                  💡 <strong>Firebase 발급 방법:</strong> <br/>
+                  1. <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-emerald-400 underline font-semibold">Firebase 콘솔</a>에 접속하여 새 프로젝트 개설 <br/>
+                  2. <strong>Firestore Database</strong>를 추가하고 보안 규칙을 <span className="text-yellow-400 font-mono">allow read, write: if true;</span> 로 세팅<br/>
+                  3. 프로젝트 앱 등록(웹) 후 발급되는 객체를 복사해서 아래에 붙여넣어주세요!
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-400 tracking-wide font-semibold block mb-1">PROJECT ID (프로젝트 ID) *</label>
+                    <input
+                      type="text"
+                      value={projectId}
+                      onChange={(e) => setProjectId(e.target.value)}
+                      placeholder="예: woojoeng-high-counsel"
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-lg p-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 tracking-wide font-semibold block mb-1">API KEY (고유 식별 키) *</label>
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="AIzaSy..."
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-lg p-2 text-xs text-slate-100 placeholder-slate-650 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-400 tracking-wide font-semibold block mb-1">AUTH DOMAIN</label>
+                    <input
+                      type="text"
+                      value={authDomain}
+                      onChange={(e) => setAuthDomain(e.target.value)}
+                      placeholder="*.firebaseapp.com"
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-lg p-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 tracking-wide font-semibold block mb-1">STORAGE BUCKET</label>
+                    <input
+                      type="text"
+                      value={storageBucket}
+                      onChange={(e) => setStorageBucket(e.target.value)}
+                      placeholder="*.appspot.com"
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-lg p-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-400 tracking-wide font-semibold block mb-1">MESSAGING SENDER ID</label>
+                    <input
+                      type="text"
+                      value={messagingSenderId}
+                      onChange={(e) => setMessagingSenderId(e.target.value)}
+                      placeholder="1049..."
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-lg p-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 tracking-wide font-semibold block mb-1">APP ID</label>
+                    <input
+                      type="text"
+                      value={appId}
+                      onChange={(e) => setAppId(e.target.value)}
+                      placeholder="1:1049...:web:..."
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-lg p-2 text-xs text-slate-100 placeholder-slate-650 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 justify-end pt-3 text-[11px] font-bold">
+                  {isCloudActive && (
+                    <button
+                      type="button"
+                      onClick={handleClearCustomFirebase}
+                      className="px-3 py-2 bg-slate-900 hover:bg-red-950/20 hover:border-red-500/30 text-rose-400 border border-slate-800 rounded-xl transition-all cursor-pointer"
+                    >
+                      실시간 구동 해제
+                    </button>
+                  )}
+                  
+                  <button
+                    type="button"
+                    onClick={handleCopyVercelEnv}
+                    title="Vercel이나 .env에 똑같이 붙여넣기 할 수 있는 환경 변수 텍스트를 복사합니다."
+                    className="px-3 py-2 bg-slate-900 border border-slate-850 hover:bg-slate-800 text-slate-300 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>Vercel 변수 복사</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveCustomFirebase}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-md shadow-orange-950/40"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>클라우드 활성화</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Dynamic status toast banner inside modal */}
+        {statusMsg.text && (
+          <div className={`mt-4 p-3 rounded-xl border text-xs font-semibold leading-relaxed animate-fade-in ${
+            statusMsg.type === 'success' 
+              ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' 
+              : statusMsg.type === 'error'
+              ? 'bg-red-950/40 border-red-500/30 text-red-300'
+              : 'bg-slate-950 border-slate-850 text-slate-300'
+          }`}>
+            {statusMsg.text}
+          </div>
+        )}
+
+        {/* Quick FAQ / Helper note */}
+        <div className="mt-6 pt-5 border-t border-slate-850 flex items-start gap-2.5">
+          <Info className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+          <div className="text-[10px] text-slate-500 leading-relaxed">
+            <strong>현재 로컬 개발 주소 상태:</strong> <br/>
+            로컬 환경에서는 full-stack Express REST API를 이용해 <code className="text-slate-400 font-mono bg-slate-950 px-1 py-0.5 rounded">records_db.json</code> 파일에 데이터가 자동 백업됩니다. Vercel이나 외부 사이트로 빌드 이동을 하면 Firebase Cloud가 연계되는 시점부터 브라우저 갱신 없이 실시간으로 타 기기와 맞물립니다.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}

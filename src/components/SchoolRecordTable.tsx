@@ -7,7 +7,7 @@ interface SchoolRecordTableProps {
   names: string[];
   onOpinionChange: (index: number, val: string) => void;
   onNameChange: (index: number, val: string) => void;
-  onSaveAll: () => Promise<void>;
+  onSaveAll: (updatedScores?: number[], updatedOpinions?: string[], updatedNames?: string[]) => Promise<void>;
   saving: boolean;
 }
 
@@ -42,13 +42,48 @@ export default function SchoolRecordTable({
     return { label: '🌱 땅', badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
   };
 
-  // Trigger manual save with visual status representation
-  const handleSingleSave = async () => {
+  // Trigger manual save with immediate optimistic status representation (instant feedback)
+  const handleSingleSave = () => {
     setAutosaveStatus('writing');
-    await onSaveAll();
-    setAutosaveStatus('saved');
-    setTimeout(() => setAutosaveStatus('idle'), 2000);
+    // Save in the background so there's zero block or delay
+    onSaveAll(scores, localOpinions, localNames).then(() => {
+      setAutosaveStatus('saved');
+      setTimeout(() => setAutosaveStatus('idle'), 2000);
+    }).catch((e) => {
+      console.warn("Background cloud save failed:", e);
+      setAutosaveStatus('idle');
+    });
+
+    // Instant visual satisfaction for the teacher
+    setTimeout(() => {
+      setAutosaveStatus('saved');
+      setTimeout(() => setAutosaveStatus('idle'), 2000);
+    }, 120);
   };
+
+  // 3. Automatic debounced background autosave as the user types
+  useEffect(() => {
+    // Check if the current local states are different from parent props
+    const opinionsChanged = JSON.stringify(localOpinions) !== JSON.stringify(opinions);
+    const namesChanged = JSON.stringify(localNames) !== JSON.stringify(names);
+    
+    if (!opinionsChanged && !namesChanged) return;
+    
+    // Set status to writing
+    setAutosaveStatus('writing');
+    
+    const debounceTimer = setTimeout(() => {
+      onSaveAll(scores, localOpinions, localNames).then(() => {
+        setAutosaveStatus('saved');
+        setTimeout(() => setAutosaveStatus('idle'), 2000);
+      }).catch((err) => {
+        console.warn("Debounced autosave write failed:", err);
+        setAutosaveStatus('idle');
+      });
+    }, 1500); // Trigger saving 1.5s after natural typing stops
+
+    return () => clearTimeout(debounceTimer);
+  }, [localOpinions, localNames]);
 
   // Filtering students
   const filteredStudents = Array.from({ length: 31 }, (_, index) => {
@@ -109,12 +144,11 @@ export default function SchoolRecordTable({
 
             <button
               onClick={handleSingleSave}
-              disabled={saving}
-              className="px-4 py-2 bg-[#4c4233] hover:bg-[#3d3428] text-[#f7f5ef] text-xs font-bold rounded-lg flex items-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 bg-[#4c4233] hover:bg-[#3d3428] text-[#f7f5ef] text-xs font-bold rounded-lg flex items-center gap-2 shadow-sm transition-all cursor-pointer"
               id="save-all-opinion-btn"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{saving ? '서버 동기화 중...' : '생활기록 전체 저장'}</span>
+              <span>생활기록 전체 저장</span>
             </button>
           </div>
         </div>
@@ -272,8 +306,8 @@ export default function SchoolRecordTable({
 
       {/* Decorative footer stamp */}
       <div className="mt-8 border-t border-[#ece7dc] pt-4 text-center text-[10px] text-[#9c9480] flex justify-center items-center gap-1.5 font-serif">
-        <span className="w-2.5 h-2.5 rounded-full border border-red-500 bg-red-500/10 inline-block" />
-        <span>우정고등학교 교무위원회 학급회장 전자인</span>
+        <span className="w-2.5 h-2.5 rounded-full border border-teal-500 bg-teal-500/10 inline-block" />
+        <span>일상 고민 상담소 생활기록 대장</span>
       </div>
     </div>
   );

@@ -13,12 +13,20 @@ import {
   Clock,
   RefreshCw,
   RotateCcw,
-  Trash2
+  Trash2,
+  Database
 } from 'lucide-react';
 import { StudentRecord } from './types';
 import AINoahChat from './components/AINoahChat';
 import StudentTrack from './components/StudentTrack';
 import SchoolRecordTable from './components/SchoolRecordTable';
+import CloudSyncSettings from './components/CloudSyncSettings';
+import { 
+  isFirebaseEnabled, 
+  saveRecordsToCloud, 
+  setupCloudSyncListener, 
+  loadRecordsFromCloud 
+} from './firebase';
 
 export default function App() {
   // Navigation & Gate state
@@ -39,6 +47,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
+  const [showCloudSettings, setShowCloudSettings] = useState(false);
+  const [cloudConnected, setCloudConnected] = useState(false);
 
   // Reset entire evaluation board back to default values
   const handleResetAll = async () => {
@@ -54,11 +64,11 @@ export default function App() {
     setShowResetConfirmModal(false);
   };
 
-  // Load records from Express on start, with robust LocalStorage fallback
+  // Load records on start, integrating cloud, API, and LocalStorage
   const fetchRecords = async () => {
     setLoading(true);
     try {
-      // 1. Load from localStorage first to guarantee zero-latency local load
+      // 1. Force state recovery from local browser immediately for zero latency
       const localScores = localStorage.getItem('noah_scores');
       const localOpinions = localStorage.getItem('noah_opinions');
       const localNames = localStorage.getItem('noah_names');
@@ -69,7 +79,23 @@ export default function App() {
       if (localNames) setNames(JSON.parse(localNames));
       if (localUnlocked) setUnlocked(localUnlocked === 'true');
 
-      // 2. Fetch from full-stack API
+      // 2. Try loading from Google Firebase Firestore if enabled
+      if (isFirebaseEnabled()) {
+        const cloudData = await loadRecordsFromCloud();
+        if (cloudData) {
+          setScores(cloudData.scores);
+          setOpinions(cloudData.opinions);
+          setNames(cloudData.names);
+          
+          localStorage.setItem('noah_scores', JSON.stringify(cloudData.scores));
+          localStorage.setItem('noah_opinions', JSON.stringify(cloudData.opinions));
+          localStorage.setItem('noah_names', JSON.stringify(cloudData.names));
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 3. Fallback to full-stack Express API
       const res = await fetch('/api/records');
       if (res.ok) {
         const data = await res.json();
@@ -86,7 +112,7 @@ export default function App() {
         }
 
         if (hasCustomServerData) {
-          // If server has custom modified data, synchronize local with it
+          // Sync state with custom backend values
           if (data.scores) {
             setScores(data.scores);
             localStorage.setItem('noah_scores', JSON.stringify(data.scores));
@@ -100,8 +126,7 @@ export default function App() {
             localStorage.setItem('noah_names', JSON.stringify(data.names));
           }
         } else {
-          // If server returns fresh/default values, but local storage already has existing data,
-          // push the local data up to synchronize the server (crucial for server restarts on Cloud Run/Vercel)
+          // Sync server back to local state if server restarted fresh
           if (localScores || localOpinions || localNames) {
             const finalScores = localScores ? JSON.parse(localScores) : Array(31).fill(50);
             const finalOpinions = localOpinions ? JSON.parse(localOpinions) : Array(31).fill('');
@@ -120,31 +145,68 @@ export default function App() {
         }
       }
     } catch (err) {
-      console.warn('Backend server unreachable or static deployment mode. Using localStorage data:', err);
-      // Fallback local state is already loaded in Step 1, so no action is required here
+      console.warn('Backend server unreachable or static deployment mode. Using localStorage:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  // Synchronise firebase state toggle reactive to configuration changes
   useEffect(() => {
+    setCloudConnected(isFirebaseEnabled());
     fetchRecords();
   }, []);
+
+  // Monitor Firebase live sync listener if cloud mode active
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+    
+    if (cloudConnected) {
+      console.log("Setting up real-time live database sync listener...");
+      unsubscribe = setupCloudSyncListener((data) => {
+        setScores(data.scores);
+        setOpinions(data.opinions);
+        setNames(data.names);
+        
+        // Ensure local values are updated
+        localStorage.setItem('noah_scores', JSON.stringify(data.scores));
+        localStorage.setItem('noah_opinions', JSON.stringify(data.opinions));
+        localStorage.setItem('noah_names', JSON.stringify(data.names));
+      }) || null;
+    }
+
+    return () => {
+      if (unsubscribe) {
+        console.log("Cleaning up live database sync listener.");
+        unsubscribe();
+      }
+    };
+  }, [cloudConnected]);
 
   // Monitor unlocked state changes to persist unlock status in local browser
   useEffect(() => {
     localStorage.setItem('noah_unlocked', String(unlocked));
   }, [unlocked]);
 
-  // Post records to Express and duplicate to LocalStorage for dual-mode persistence (supports Serverless / Static / Vercel restarts)
+  // Post records database to physical resources
   const saveRecords = async (updatedScores = scores, updatedOpinions = opinions, updatedNames = names) => {
     setSaving(true);
     
-    // Always persist to localStorage immediately (guarantees persistence on Vercel/GitHub pages)
+    // Always persist to localStorage immediately
     localStorage.setItem('noah_scores', JSON.stringify(updatedScores));
     localStorage.setItem('noah_opinions', JSON.stringify(updatedOpinions));
     localStorage.setItem('noah_names', JSON.stringify(updatedNames));
 
+    // Try cloud write if active
+    if (cloudConnected) {
+      const ok = await saveRecordsToCloud(updatedScores, updatedOpinions, updatedNames);
+      if (ok) {
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Otherwise fallback REST API save
     try {
       const res = await fetch('/api/records', {
         method: 'POST',
@@ -268,6 +330,20 @@ export default function App() {
 
           {/* Time and Active status section */}
           <div className="flex items-center gap-3">
+            {/* Real-time Cloud sync toggle button */}
+            <button
+              onClick={() => setShowCloudSettings(true)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 border transition-all duration-250 cursor-pointer ${
+                cloudConnected 
+                  ? 'bg-emerald-950/45 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/40 hover:border-emerald-500/60 shadow-md shadow-emerald-950/20' 
+                  : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+              title="다른 기기/Vercel과 데이터를 실시간으로 동기화하는 클라우드 설정을 엽니다."
+            >
+              <Database className={`w-3.5 h-3.5 ${cloudConnected ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
+              <span>{cloudConnected ? '클라우드 ON' : '클라우드 미연동'}</span>
+            </button>
+
             <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-slate-900/45 rounded-lg border border-slate-800 text-[10px] text-slate-400 font-mono">
               <Clock className="w-3.5 h-3.5 text-slate-500" />
               <span>2026-06-08 12:30:00</span>
@@ -487,7 +563,7 @@ export default function App() {
                   names={names}
                   onOpinionChange={handleOpinionChange}
                   onNameChange={handleNameChange}
-                  onSaveAll={handleBulkSave}
+                  onSaveAll={saveRecords}
                   saving={saving}
                 />
               </div>
@@ -616,6 +692,15 @@ export default function App() {
           <p className="text-[10px] font-mono select-none text-slate-700 hover:text-slate-500 transition-colors">시스템 모니터 | PORT: 3000 | RE records_db.json | NODE CONTAINER</p>
         </div>
       </footer>
+
+      {/* Cloud Sync Settings Modal */}
+      <CloudSyncSettings 
+        isOpen={showCloudSettings} 
+        onClose={() => setShowCloudSettings(false)} 
+        onConfigChange={() => {
+          setCloudConnected(isFirebaseEnabled());
+        }} 
+      />
 
     </div>
   );
