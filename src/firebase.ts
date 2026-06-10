@@ -16,14 +16,23 @@ export function getStoredFirebaseConfig(): FirebaseConfig | null {
   // 1. Try to read from environment variables (useful for pre-configured Vercel/GitHub Pages deployments)
   const metaEnv = (import.meta as any).env;
   const envKey = metaEnv?.VITE_FIREBASE_API_KEY;
-  if (envKey && envKey.trim() !== "") {
+  const envProjectId = metaEnv?.VITE_FIREBASE_PROJECT_ID;
+  
+  if (
+    envKey && 
+    envKey.trim() !== "" && 
+    envKey !== "undefined" && 
+    envProjectId && 
+    envProjectId.trim() !== "" && 
+    envProjectId !== "undefined"
+  ) {
     return {
-      apiKey: envKey,
-      authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || "",
-      projectId: metaEnv.VITE_FIREBASE_PROJECT_ID || "",
-      storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || "",
-      messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-      appId: metaEnv.VITE_FIREBASE_APP_ID || "",
+      apiKey: envKey.trim(),
+      authDomain: (metaEnv.VITE_FIREBASE_AUTH_DOMAIN || "").trim(),
+      projectId: envProjectId.trim(),
+      storageBucket: (metaEnv.VITE_FIREBASE_STORAGE_BUCKET || "").trim(),
+      messagingSenderId: (metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID || "").trim(),
+      appId: (metaEnv.VITE_FIREBASE_APP_ID || "").trim(),
     };
   }
 
@@ -69,20 +78,20 @@ export function initializeFirebase(): boolean {
   try {
     if (getApps().length === 0) {
       firebaseApp = initializeApp(config);
-    } else {
-      firebaseApp = getApp();
-    }
-    
-    // Safely attempt initializeFirestore first with force long polling enabled
-    try {
       firestoreDb = initializeFirestore(firebaseApp, {
         experimentalForceLongPolling: true,
       });
       console.log("Firebase & Firestore initialized with Long Polling successfully!");
-    } catch (e) {
-      // If already initialized, get the existing occurrence
-      firestoreDb = getFirestore(firebaseApp);
-      console.log("Firestore retrieved existing instance.");
+    } else {
+      firebaseApp = getApp();
+      try {
+        firestoreDb = getFirestore(firebaseApp);
+      } catch (e) {
+        firestoreDb = initializeFirestore(firebaseApp, {
+          experimentalForceLongPolling: true,
+        });
+      }
+      console.log("Firestore retrieved existing or re-initialized instance successfully.");
     }
     return true;
   } catch (error) {
