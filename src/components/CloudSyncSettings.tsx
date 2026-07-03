@@ -619,7 +619,7 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
                         <span>상담 일지 조회 잠금</span>
                       </div>
                       <p className="text-[9px] text-slate-400 leading-relaxed">
-                        학생 상담 일지 열람을 위해 선생님 비밀번호를 입력해 주세요. (기본 비밀번호: <code className="text-slate-200 font-mono bg-slate-900 px-1 py-0.5 rounded">960309</code>)
+                        학생 상담 일지 열람을 위해 선생님 비밀번호를 입력해 주세요.
                       </p>
                       <form 
                         onSubmit={(e) => {
