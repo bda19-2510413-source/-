@@ -40,6 +40,39 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
   const [shareCopied, setShareCopied] = useState(false);
   const [testing, setTesting] = useState(false);
   
+  const [neonStatus, setNeonStatus] = useState<{ status: string; message: string; count?: number } | null>(null);
+  const [neonLoading, setNeonLoading] = useState(false);
+  const [counselingLogs, setCounselingLogs] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+
+  const checkNeonStatus = async () => {
+    setNeonLoading(true);
+    try {
+      const res = await fetch('/api/db-status');
+      const data = await res.json();
+      setNeonStatus(data);
+    } catch (e) {
+      console.error("Failed to check Neon status:", e);
+      setNeonStatus({ status: "error", message: "서버 API 연결에 실패했습니다." });
+    } finally {
+      setNeonLoading(false);
+    }
+  };
+
+  const loadCounselingLogs = async () => {
+    setLogsLoading(true);
+    try {
+      const res = await fetch('/api/counseling-logs');
+      const data = await res.json();
+      setCounselingLogs(data);
+    } catch (e) {
+      console.error("Failed to fetch counseling logs:", e);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+  
   const getShareUrl = () => {
     if (typeof window === 'undefined') return '';
     const origin = window.location.origin;
@@ -88,6 +121,8 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
         setMessagingSenderId(config.messagingSenderId || '');
         setAppId(config.appId || '');
       }
+
+      checkNeonStatus();
     }
   }, [isOpen]);
 
@@ -413,6 +448,97 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Section 3: Neon PostgreSQL Counseling Database */}
+          <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800">
+            <label className="text-[11px] text-teal-400 font-bold tracking-wider uppercase block mb-1.5 flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5 text-amber-500" /> 3단계: Neon PostgreSQL 상담 기록 연동 & 조회
+            </label>
+            <p className="text-[10px] text-slate-500 mb-2.5 leading-relaxed">
+              AI 상담교사 '승환 쌤'과의 상담 대화 일지가 실시간으로 Neon 클라우드 데이터베이스에 안전하게 기록됩니다.
+            </p>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 shrink-0">DB 엔드포인트:</span>
+                  <span className="text-[10px] font-mono text-slate-500 truncate" title="ep-ancient-art-aomh7xrl...">
+                    ep-ancient-art-aomh7xrl-pooler...
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] text-slate-400 shrink-0">연결 상태:</span>
+                  {neonLoading ? (
+                    <span className="text-[10px] text-slate-400 animate-pulse">상태 점검 중...</span>
+                  ) : neonStatus?.status === 'connected' ? (
+                    <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                      연결됨 (저장된 상담: {neonStatus.count}건)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-rose-400 font-bold">오프라인 / 연결 실패</span>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  checkNeonStatus();
+                  if (showLogs) loadCounselingLogs();
+                }}
+                disabled={neonLoading}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:text-white font-bold rounded-xl text-[10px] transition-all cursor-pointer flex items-center gap-1 shrink-0"
+              >
+                <RefreshCw className={`w-3 h-3 ${neonLoading ? 'animate-spin' : ''}`} />
+                연결 확인하기
+              </button>
+            </div>
+
+            {/* Counseling logs expander */}
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextState = !showLogs;
+                  setShowLogs(nextState);
+                  if (nextState) {
+                    loadCounselingLogs();
+                  }
+                }}
+                className="w-full py-2 bg-slate-900/60 hover:bg-slate-900 border border-slate-850 rounded-xl text-[10px] text-slate-300 font-semibold hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>{showLogs ? "상담 기록 창 닫기" : "저장된 상담 기록 전체 보기 🔍"}</span>
+              </button>
+
+              {showLogs && (
+                <div className="mt-2 bg-slate-950 rounded-xl border border-slate-850 p-2.5 max-h-[220px] overflow-y-auto space-y-2.5 animate-fade-in custom-scrollbar">
+                  {logsLoading ? (
+                    <div className="text-center py-6 text-slate-500 text-[10px] animate-pulse">상담 일지를 불러오는 중입니다...</div>
+                  ) : counselingLogs.length === 0 ? (
+                    <div className="text-center py-6 text-slate-500 text-[10px]">아직 기록된 상담 데이터가 없습니다.</div>
+                  ) : (
+                    counselingLogs.map((log) => (
+                      <div key={log.id} className="p-2.5 bg-slate-900 border border-slate-850 rounded-xl text-[10px] space-y-1.5">
+                        <div className="flex justify-between items-center text-[9px] text-slate-500 border-b border-slate-800 pb-1 mb-1 font-mono">
+                          <span className="text-teal-400 font-semibold">{log.detected_pillar || "[미분류]"}</span>
+                          <span>{new Date(log.created_at).toLocaleString('ko-KR')}</span>
+                        </div>
+                        <div>
+                          <span className="text-amber-400 font-bold block text-[9px]">학생 고민 내용:</span>
+                          <p className="text-slate-300 pl-1 leading-relaxed">{log.user_message}</p>
+                        </div>
+                        <div className="mt-1 pt-1 border-t border-slate-800/60">
+                          <span className="text-emerald-400 font-bold block text-[9px]">이승환 선생님 답변:</span>
+                          <p className="text-slate-300 pl-1 leading-relaxed whitespace-pre-wrap">{log.ai_response}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
