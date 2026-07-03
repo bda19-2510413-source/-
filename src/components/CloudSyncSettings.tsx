@@ -14,7 +14,8 @@ import {
   Sparkles,
   HelpCircle,
   FilePlus,
-  ArrowRight
+  ArrowRight,
+  Lock
 } from 'lucide-react';
 import { 
   FirebaseConfig, 
@@ -45,6 +46,9 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
   const [counselingLogs, setCounselingLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [logsUnlocked, setLogsUnlocked] = useState(false);
+  const [logsPasswordInput, setLogsPasswordInput] = useState('');
+  const [logsPasswordError, setLogsPasswordError] = useState('');
 
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
   const [geminiStatus, setGeminiStatus] = useState<{ configured: boolean; source: string; masked?: string } | null>(null);
@@ -167,6 +171,10 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
 
       checkNeonStatus();
       checkGeminiKeyStatus();
+      setLogsUnlocked(false);
+      setLogsPasswordInput('');
+      setLogsPasswordError('');
+      setShowLogs(false);
     }
   }, [isOpen]);
 
@@ -530,7 +538,7 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
                 type="button"
                 onClick={() => {
                   checkNeonStatus();
-                  if (showLogs) loadCounselingLogs();
+                  if (showLogs && logsUnlocked) loadCounselingLogs();
                 }}
                 disabled={neonLoading}
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:text-white font-bold rounded-xl text-[10px] transition-all cursor-pointer flex items-center gap-1 shrink-0"
@@ -593,7 +601,7 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
                 onClick={() => {
                   const nextState = !showLogs;
                   setShowLogs(nextState);
-                  if (nextState) {
+                  if (nextState && logsUnlocked) {
                     loadCounselingLogs();
                   }
                 }}
@@ -603,30 +611,75 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
               </button>
 
               {showLogs && (
-                <div className="mt-2 bg-slate-950 rounded-xl border border-slate-850 p-2.5 max-h-[220px] overflow-y-auto space-y-2.5 animate-fade-in custom-scrollbar">
-                  {logsLoading ? (
-                    <div className="text-center py-6 text-slate-500 text-[10px] animate-pulse">상담 일지를 불러오는 중입니다...</div>
-                  ) : counselingLogs.length === 0 ? (
-                    <div className="text-center py-6 text-slate-500 text-[10px]">아직 기록된 상담 데이터가 없습니다.</div>
-                  ) : (
-                    counselingLogs.map((log) => (
-                      <div key={log.id} className="p-2.5 bg-slate-900 border border-slate-850 rounded-xl text-[10px] space-y-1.5">
-                        <div className="flex justify-between items-center text-[9px] text-slate-500 border-b border-slate-800 pb-1 mb-1 font-mono">
-                          <span className="text-teal-400 font-semibold">{log.detected_pillar || "[미분류]"}</span>
-                          <span>{new Date(log.created_at).toLocaleString('ko-KR')}</span>
-                        </div>
-                        <div>
-                          <span className="text-amber-400 font-bold block text-[9px]">학생 고민 내용:</span>
-                          <p className="text-slate-300 pl-1 leading-relaxed">{log.user_message}</p>
-                        </div>
-                        <div className="mt-1 pt-1 border-t border-slate-800/60">
-                          <span className="text-emerald-400 font-bold block text-[9px]">이승환 선생님 답변:</span>
-                          <p className="text-slate-300 pl-1 leading-relaxed whitespace-pre-wrap">{log.ai_response}</p>
-                        </div>
+                <>
+                  {!logsUnlocked ? (
+                    <div className="mt-2 bg-slate-950 rounded-xl border border-slate-850 p-3 space-y-2 animate-fade-in text-[10px]">
+                      <div className="flex items-center gap-1.5 text-amber-400 font-bold">
+                        <Lock className="w-3.5 h-3.5 text-amber-500" />
+                        <span>상담 일지 조회 잠금</span>
                       </div>
-                    ))
+                      <p className="text-[9px] text-slate-400 leading-relaxed">
+                        학생 상담 일지 열람을 위해 선생님 비밀번호를 입력해 주세요. (기본 비밀번호: <code className="text-slate-200 font-mono bg-slate-900 px-1 py-0.5 rounded">960309</code>)
+                      </p>
+                      <form 
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (logsPasswordInput === '960309') {
+                            setLogsUnlocked(true);
+                            setLogsPasswordError('');
+                            setLogsPasswordInput('');
+                            loadCounselingLogs();
+                          } else {
+                            setLogsPasswordError('비밀번호가 올바르지 않습니다. 다시 확인해 주세요.');
+                          }
+                        }}
+                        className="flex gap-2"
+                      >
+                        <input
+                          type="password"
+                          value={logsPasswordInput}
+                          onChange={(e) => setLogsPasswordInput(e.target.value)}
+                          placeholder="비밀번호 입력"
+                          className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-[11px] text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+                        />
+                        <button
+                          type="submit"
+                          className="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold rounded-xl text-[10px] transition-all cursor-pointer"
+                        >
+                          인증하기
+                        </button>
+                      </form>
+                      {logsPasswordError && (
+                        <p className="text-[9px] text-rose-400 font-medium">{logsPasswordError}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-2 bg-slate-950 rounded-xl border border-slate-850 p-2.5 max-h-[220px] overflow-y-auto space-y-2.5 animate-fade-in custom-scrollbar">
+                      {logsLoading ? (
+                        <div className="text-center py-6 text-slate-500 text-[10px] animate-pulse">상담 일지를 불러오는 중입니다...</div>
+                      ) : counselingLogs.length === 0 ? (
+                        <div className="text-center py-6 text-slate-500 text-[10px]">아직 기록된 상담 데이터가 없습니다.</div>
+                      ) : (
+                        counselingLogs.map((log) => (
+                          <div key={log.id} className="p-2.5 bg-slate-900 border border-slate-850 rounded-xl text-[10px] space-y-1.5">
+                            <div className="flex justify-between items-center text-[9px] text-slate-500 border-b border-slate-800 pb-1 mb-1 font-mono">
+                              <span className="text-teal-400 font-semibold">{log.detected_pillar || "[미분류]"}</span>
+                              <span>{new Date(log.created_at).toLocaleString('ko-KR')}</span>
+                            </div>
+                            <div>
+                              <span className="text-amber-400 font-bold block text-[9px]">학생 고민 내용:</span>
+                              <p className="text-slate-300 pl-1 leading-relaxed">{log.user_message}</p>
+                            </div>
+                            <div className="mt-1 pt-1 border-t border-slate-800/60">
+                              <span className="text-emerald-400 font-bold block text-[9px]">이승환 선생님 답변:</span>
+                              <p className="text-slate-300 pl-1 leading-relaxed whitespace-pre-wrap">{log.ai_response}</p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           </div>
