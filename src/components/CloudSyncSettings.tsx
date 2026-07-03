@@ -46,6 +46,49 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
   const [logsLoading, setLogsLoading] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
 
+  const [geminiKeyInput, setGeminiKeyInput] = useState('');
+  const [geminiStatus, setGeminiStatus] = useState<{ configured: boolean; source: string; masked?: string } | null>(null);
+  const [savingGeminiKey, setSavingGeminiKey] = useState(false);
+
+  const checkGeminiKeyStatus = async () => {
+    try {
+      const res = await fetch('/api/get-gemini-key-status');
+      const data = await res.json();
+      setGeminiStatus(data);
+    } catch (e) {
+      console.error("Failed to check Gemini key status:", e);
+    }
+  };
+
+  const handleSaveGeminiKey = async () => {
+    if (!geminiKeyInput.trim()) {
+      setStatusMsg({ text: 'Gemini API Key를 입력해주세요.', type: 'error' });
+      return;
+    }
+    setSavingGeminiKey(true);
+    try {
+      const res = await fetch('/api/save-gemini-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: geminiKeyInput.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStatusMsg({ text: data.message || 'Gemini API Key가 안전하게 저장되었습니다!', type: 'success' });
+        setGeminiKeyInput('');
+        checkGeminiKeyStatus();
+      } else {
+        setStatusMsg({ text: data.error || 'Gemini API Key 저장에 실패했습니다.', type: 'error' });
+      }
+    } catch (e) {
+      console.error("Failed to save Gemini key:", e);
+      setStatusMsg({ text: '서버와 통신하는 중 오류가 발생했습니다.', type: 'error' });
+    } finally {
+      setSavingGeminiKey(false);
+      setTimeout(() => setStatusMsg({ text: '', type: null }), 4000);
+    }
+  };
+
   const checkNeonStatus = async () => {
     setNeonLoading(true);
     try {
@@ -123,6 +166,7 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
       }
 
       checkNeonStatus();
+      checkGeminiKeyStatus();
     }
   }, [isOpen]);
 
@@ -494,6 +538,52 @@ export default function CloudSyncSettings({ isOpen, onClose, onConfigChange }: C
                 <RefreshCw className={`w-3 h-3 ${neonLoading ? 'animate-spin' : ''}`} />
                 연결 확인하기
               </button>
+            </div>
+
+            {/* Gemini API Key input for server-side persistence */}
+            <div className="mt-3.5 pt-3.5 border-t border-slate-800/80">
+              <label className="text-[10px] text-teal-400 font-bold tracking-wide block mb-1.5 flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5 text-emerald-400" /> [선택] AI 상담용 Gemini API Key (비밀 코드 등록)
+              </label>
+              <p className="text-[9px] text-slate-500 mb-2.5 leading-relaxed">
+                Vercel 환경 변수가 없을 때 이곳에 Gemini API Key를 입력하고 연동해 두면, 전 세계 모든 사용자가 비밀번호를 입력하거나 다른 복잡한 설정 없이도 승환 쌤과 실시간 상담을 바로 나눌 수 있습니다. (Neon PostgreSQL DB에 공유 저장됨)
+              </p>
+
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={geminiKeyInput}
+                  onChange={(e) => setGeminiKeyInput(e.target.value)}
+                  placeholder={
+                    geminiStatus?.configured 
+                      ? `이미 등록되어 있습니다 (${geminiStatus.masked})` 
+                      : "AIzaSy..."
+                  }
+                  className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500/50"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveGeminiKey}
+                  disabled={savingGeminiKey}
+                  className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-teal-950/20 disabled:opacity-50"
+                >
+                  {savingGeminiKey ? '등록 중...' : '키 등록'}
+                </button>
+              </div>
+
+              {geminiStatus && (
+                <div className="mt-2 text-[9px] text-slate-400 font-medium flex items-center justify-between">
+                  <span>현재 연동 상태:</span>
+                  {geminiStatus.configured ? (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block animate-pulse" />
+                      활성화됨 ({geminiStatus.source === 'env' ? 'Vercel 서버 환경 변수' : '클라우드 DB 저장값'})
+                    </span>
+                  ) : (
+                    <span className="text-rose-400 font-bold">비활성화됨 (상담 불가능)</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Counseling logs expander */}

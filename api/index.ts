@@ -59,7 +59,15 @@ async function initDB() {
         );
       `);
 
-      // 3. Seed student records if completely empty
+      // 3. Create system_settings table to share Gemini API Key across users
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS system_settings (
+          key VARCHAR(100) PRIMARY KEY,
+          value TEXT
+        );
+      `);
+
+      // 4. Seed student records if completely empty
       const checkResult = await client.query("SELECT COUNT(*) FROM student_records;");
       const count = parseInt(checkResult.rows[0].count, 10);
       if (count === 0) {
@@ -213,25 +221,31 @@ async function saveRecordsToPostgres(data: { scores: number[]; opinions: string[
   }
 }
 
-// Lazy init Gemini AI Client
-let ai: GoogleGenAI | null = null;
-function getAI() {
-  if (!ai) {
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey) {
-      console.warn("GEMINI_API_KEY environment variable is not set.");
-      return null;
-    }
-    ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
+let cachedGeminiKey: string | null = null;
+
+async function getGeminiKey() {
+  // 1. Try environment variable first
+  const envKey = process.env.GEMINI_API_KEY?.trim();
+  if (envKey && envKey !== "undefined" && envKey !== "") return envKey;
+
+  // 2. Try in-memory cached key
+  if (cachedGeminiKey) return cachedGeminiKey;
+
+  // 3. Try PostgreSQL database lookup
+  try {
+    const active = await initDB();
+    if (active) {
+      const dbRes = await pool.query("SELECT value FROM system_settings WHERE key = 'GEMINI_API_KEY';");
+      if (dbRes.rows.length > 0 && dbRes.rows[0].value?.trim()) {
+        cachedGeminiKey = dbRes.rows[0].value.trim();
+        return cachedGeminiKey;
       }
-    });
+    }
+  } catch (err) {
+    console.error("Failed to fetch GEMINI_API_KEY from database:", err);
   }
-  return ai;
+
+  return null;
 }
 
 // API Routes
@@ -285,13 +299,22 @@ app.post(["/api/chat", "/chat"], async (req, res) => {
   const cleanedMessage = String(message).trim();
   const isTrigger = cleanedMessage === "결과 보여줘" || cleanedMessage.includes("결과 보여줘");
 
-  const client = getAI();
-  if (!client) {
+  const apiKey = await getGeminiKey();
+  if (!apiKey) {
     return res.json({
       reply: "안녕하세요! 찾아와 줘서 고마워요. 지금은 제가 아직 비밀 코드를 활성화하지 않아서 이야기를 나누기가 조금 어렵네요. 선생님이 곧 도와줄 테니 잠시만 기다려 주세요! \n\n[자기이해 및 자아상]",
       triggerResult: isTrigger
     });
   }
+
+  const client = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      }
+    }
+  });
 
   try {
     const systemInstruction = `
@@ -418,6 +441,65 @@ app.get(["/api/counseling-logs", "/counseling-logs"], async (req, res) => {
     res.json(result.rows);
   } catch (err: any) {
     console.error("Error fetching counseling logs:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/get-gemini-key-status
+app.get(["/api/get-gemini-key-status", "/get-gemini-key-status"], async (req, res) => {
+  try {
+    const active = await initDB();
+    if (!active) {
+      return res.json({ configured: false, source: "none" });
+    }
+
+    // Check environment first
+    if (process.env.GEMINI_API_KEY?.trim()) {
+      const k = process.env.GEMINI_API_KEY.trim();
+      const masked = k.slice(0, 6) + "..." + k.slice(-4);
+      return res.json({ configured: true, source: "env", masked });
+    }
+
+    // Check system_settings table
+    const dbRes = await pool.query("SELECT value FROM system_settings WHERE key = 'GEMINI_API_KEY';");
+    if (dbRes.rows.length > 0 && dbRes.rows[0].value?.trim()) {
+      const k = dbRes.rows[0].value.trim();
+      const masked = k.slice(0, 6) + "..." + k.slice(-4);
+      return res.json({ configured: true, source: "db", masked });
+    }
+
+    res.json({ configured: false, source: "none" });
+  } catch (err: any) {
+    console.error("Failed to get Gemini key status:", err);
+    res.json({ configured: false, source: "none", error: err.message });
+  }
+});
+
+// POST /api/save-gemini-key
+app.post(["/api/save-gemini-key", "/save-gemini-key"], async (req, res) => {
+  const { apiKey } = req.body;
+  if (!apiKey || typeof apiKey !== "string") {
+    return res.status(400).json({ error: "Gemini API Key가 누락되었습니다." });
+  }
+
+  try {
+    const active = await initDB();
+    if (!active) {
+      return res.status(500).json({ error: "PostgreSQL 데이터베이스가 준비되지 않았습니다." });
+    }
+
+    await pool.query(
+      `INSERT INTO system_settings (key, value) 
+       VALUES ('GEMINI_API_KEY', $1)
+       ON CONFLICT (key) DO UPDATE 
+       SET value = EXCLUDED.value;`,
+      [apiKey.trim()]
+    );
+
+    cachedGeminiKey = apiKey.trim();
+    res.json({ success: true, message: "Gemini API Key가 클라우드 데이터베이스에 안전하게 공유/저장되었습니다!" });
+  } catch (err: any) {
+    console.error("Failed to save Gemini API key:", err);
     res.status(500).json({ error: err.message });
   }
 });
